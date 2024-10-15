@@ -90,3 +90,4 @@ Werkzeug==3.0.1
 Wikipedia-API==0.5.8
 word2number==1.1
 wrapt==1.15.0
+pdbqq

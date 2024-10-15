@@ -8,4 +8,6 @@ results/
 .cache/
 __pycache__/
 methods/__pycache__/
-test.ipynb
+test.ipynb、
+benchmark.slurm
+data/

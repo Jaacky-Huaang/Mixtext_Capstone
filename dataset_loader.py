@@ -7,6 +7,7 @@ import json
 import numpy as np
 import random
 import os
+import pdb
 
 # you can add more datasets here and write your own dataset parsing function
 DATASETS = ['TruthfulQA', 'SQuAD1', 'NarrativeQA', 'Mixcase', 'All']
@@ -163,7 +164,7 @@ def shuffle_and_trim_data(data_new, seed, train_threshold):
 
     return new_text[:train_threshold], new_label[:train_threshold]
 
-def process_mixcase_data(filename1, filename2, no_auc, mixcase_threshold, train_with_mixcase, seed, three_classes, data_new, test_only, mgt_only_gpt:bool=False, mixcase_as_mgt:bool=False):
+def process_mixcase_data(filename1, filename2, no_auc, mixcase_threshold, train_with_mixcase, seed, three_classes, test_only, mgt_only_gpt:bool=False, mixcase_as_mgt:bool=False):
     """
     Process the Mixcase data based on the given parameters.
 
@@ -199,10 +200,12 @@ def process_mixcase_data(filename1, filename2, no_auc, mixcase_threshold, train_
             Mixcase_data = load_Mixcase(filename=filename1, no_auc=no_auc, train_with_mixcase=train_with_mixcase, mixcase_as_mgt=mixcase_as_mgt)
             data_new['test']['text'] += Mixcase_data['text']
             data_new['test']['label'] += Mixcase_data['label']
-        else:
+        else: #✅ 跑benchmark时会执行这里
             # Load and process multiple files for Mixcase data
             load_and_process_multiple_mixcase_files(data_new, no_auc, mixcase_threshold, train_with_mixcase, seed, three_classes, mgt_only_gpt=mgt_only_gpt, mixcase_as_mgt=mixcase_as_mgt)
+            pdb.set_trace()
             Test_Mixcase_data = load_Mixcase(filename1, no_auc, mixcase_threshold, train_with_mixcase, seed, three_classes, mixcase_as_mgt=mixcase_as_mgt)
+            pdb.set_trace()
             data_new['test']['text'] += Test_Mixcase_data['test']['text']
             data_new['test']['label'] += Test_Mixcase_data['test']['label']
     else:
@@ -220,6 +223,11 @@ def process_mixcase_data(filename1, filename2, no_auc, mixcase_threshold, train_
         # set training data to none for quicker inference
         data_new['train']['text'] = []
         data_new['train']['label'] = []
+    else:
+        # shuffle training data
+        new_text, new_label = shuffle_and_trim_data(data_new, seed, len(data_new['train']['label']))
+        data_new['train']['text'] = new_text
+        data_new['train']['label'] = new_label
     
     return data_new
 
@@ -318,11 +326,11 @@ def load_Mixcase(filename, no_auc:bool=False, mixcase_threshold: float=0.8, trai
     Returns:
         dict: A dictionary containing the loaded dataset.
     """
-    with open(os.path.join("./data/MixSet",filename)) as file:
+    with open(os.path.join("./data/MixSet/separated_files",filename)) as file:
         f = json.load(file)
     mgt = []
     hwt = []
-    for key in f[0].keys():
+    for key in f[0].keys(): # "category", "model", "id", "MGT_sentence",  "llama_humanize_output"
         if "output" in str(key):
             real_key = key
     if "HWT_sentence" in f[0].keys():
@@ -358,7 +366,7 @@ def load_Mixcase(filename, no_auc:bool=False, mixcase_threshold: float=0.8, trai
             for i in tqdm.tqdm(range(total_num), desc="parsing data"):
                 if index_list[i] < len(mgt):
                     data_new['text'].append(
-                        process_spaces(mgt[index_list[i]]))
+                        (mgt[index_list[i]]))
                     data_new['label'].append(1)
                 elif not no_auc:
                     index = index_list[i] - len(mgt)

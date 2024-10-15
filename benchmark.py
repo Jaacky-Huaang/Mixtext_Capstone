@@ -11,6 +11,12 @@ from methods.gptzero import run_gptzero_experiment
 from methods.radar import run_radar
 from methods.sentinel import run_sentinel
 from methods.metric_based import get_ll, get_rank, get_entropy, get_rank_GLTR, run_threshold_experiment, run_GLTR_experiment
+import pdb
+
+
+# Change the DATA_FILE to the path of the data file
+DATA_FILE = "/scratch/jh7956/mixset_data/truncated_data.json"
+# python /scratch/jh7956/MixSet/benchmark.py --dataset All --Mixcase_filename gpt4_polish_token.json --seed 0 --mixcase_threshold 1 --train_threshold 10000 --train_with_mixcase --finetune --three_classes
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -49,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--MGT_only_GPT', action='store_true')
     parser.add_argument('--test_only', action='store_true')
     parser.add_argument('--train_threshold', type=int, default=10000)
+    parser.add_argument('--test_threshold', type=int, default=2000)
     parser.add_argument('--no_auc', action='store_true')
     parser.add_argument('--only_supervised', action='store_true')
     parser.add_argument('--train_with_mixcase', action='store_true')
@@ -60,23 +67,23 @@ if __name__ == '__main__':
     parser.add_argument('--three_classes', action='store_true')
     parser.add_argument('--finetune', action="store_true")
     parser.add_argument('--mixcase_as_mgt', action="store_true")
+
     
     args = parser.parse_args()
 
-    if args.dataset != "All":
-        data = dataset_loader.load(args.dataset, detectLLM=args.detectLLM)
-    else:
-        data = dataset_loader.load(args.dataset, filename1 = args.Mixcase_filename,
-                                   MGT_only_GPT = args.MGT_only_GPT,
-                                   test_only = args.test_only,
-                                   train_threshold = args.train_threshold,
-                                   no_auc = args.no_auc,
-                                   train_with_mixcase = args.train_with_mixcase,
-                                   seed = args.seed,
-                                   mixcase_threshold = args.mixcase_threshold,
-                                   filename2 = args.transfer_filename,
-                                   three_classes = args.three_classes,
-                                   mixcase_as_mgt = args.mixcase_as_mgt)
+
+    # load the DATAFILE
+    with open(DATA_FILE, 'r') as file:
+        data = json.load(file)
+    
+    # truncate the training data to args.train_threshold: 10000 and the testing to args.test_threshold: 1000
+    if args.train_threshold:
+        data['train']['text'] = data['train']['text'][:args.train_threshold]
+        data['train']['label'] = data['train']['label'][:args.train_threshold]
+    if args.test_threshold:
+        data['test']['text'] = data['test']['text'][:args.test_threshold]
+        data['test']['label'] = data['test']['label'][:args.test_threshold]
+
     if not os.path.exists(args.ckpt_dir):
         os.makedirs(args.ckpt_dir)
         print(f"'{args.ckpt_dir}' are created.")
@@ -133,20 +140,23 @@ if __name__ == '__main__':
     outputs = []
     
     if args.three_classes:
-        outputs.append(run_threshold_experiment(data, ll_criterion, "likelihood", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
-        outputs.append(run_threshold_experiment(data, rank_criterion, "rank", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
-        outputs.append(run_threshold_experiment(
-            data, logrank_criterion, "log_rank", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
-        outputs.append(run_threshold_experiment(
-            data, entropy_criterion, "entropy", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
-        outputs.append(run_GLTR_experiment(data, GLTR_criterion, "rank_GLTR", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
-        outputs.append(run_supervised_experiment(data, model='distilbert-base-uncased',
-                   cache_dir=cache_dir, batch_size=batch_size, DEVICE=DEVICE, pos_bit=1, num_labels=3, finetune=True, test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        # outputs.append(run_threshold_experiment(data, ll_criterion, "likelihood", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        # outputs.append(run_threshold_experiment(data, rank_criterion, "rank", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        # outputs.append(run_threshold_experiment(
+        #     data, logrank_criterion, "log_rank", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        # outputs.append(run_threshold_experiment(
+        #     data, entropy_criterion, "entropy", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        # outputs.append(run_GLTR_experiment(data, GLTR_criterion, "rank_GLTR", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        # outputs.append(run_supervised_experiment(data, model='distilbert-base-uncased',
+        #            cache_dir=cache_dir, batch_size=batch_size, DEVICE=DEVICE, pos_bit=1, num_labels=3, finetune=True, test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
         outputs.append(run_supervised_experiment(data, model='Hello-SimpleAI/chatgpt-detector-roberta',
                     cache_dir=cache_dir, batch_size=batch_size, DEVICE=DEVICE, pos_bit=1, num_labels=3, test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir, finetune=True))
+        print("roberta done")
         outputs.append(run_detectgpt_experiments(
             args, data, base_model, base_tokenizer, test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
+        print("detectgpt done")
         outputs.append(run_radar(data, DEVICE=DEVICE, finetune=args.finetune, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir, test_only=args.test_only, three_classes=args.three_classes))
+        print("radar done")
     else:
         if not args.only_supervised:
             outputs.append(run_threshold_experiment(data, ll_criterion, "likelihood", test_only = args.test_only, no_auc=args.no_auc, ckpt_dir=args.ckpt_dir))
